@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8"/>
+  <title>VPK Food Explorer</title>
+  <style>
+    /* ─── Prevent Selection & Copy ───────────────────────────────────────── */
+    html, body {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-top: 1rem;
+    }
+
+    /* ─── Carousel Styles ───────────────────────────────────────────────── */
+    .carousel {
+      position: relative;
+      width: 100%;
+      max-width: 800px;
+      height: 250px;
+      margin: 0 auto 2rem;
+      overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .carousel .slide {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+    .carousel .slide.active {
+      opacity: 1;
+    }
+    .carousel button {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.4);
+      border: none;
+      color: #fff;
+      font-size: 2rem;
+      padding: 0 .5rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .carousel button.prev { left: 1rem; }
+    .carousel button.next { right: 1rem; }
+
+    /* ─── Explorer Styles ──────────────────────────────────────────────── */
+    #controls { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+    input, select { padding: .5rem; margin: .5rem; font-size: 1rem; }
+    table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: .6rem; text-align: center; }
+    th { background: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Banner Carousel ───────────────────────────────────────────────── -->
+  <div class="carousel">
+    <img src="banner1.webp" class="slide active" alt="Banner 1">
+    <img src="banner2.webp" class="slide"       alt="Banner 2">
+    <img src="banner3.webp" class="slide"       alt="Banner 3">
+    <button class="prev">‹</button>
+    <button class="next">›</button>
+  </div>
+
+  <h1>🧘‍♂️ VPK Food Explorer</h1>
+
+  <div id="controls">
+    <input  type="text"    id="searchInput" placeholder="Search food…" />
+    <select id="vataFilter">
+      <option value="">Vata</option>
+      <option value="increase">Increase</option>
+      <option value="decrease">Decrease</option>
+    </select>
+    <select id="pittaFilter">
+      <option value="">Pitta</option>
+      <option value="increase">Increase</option>
+      <option value="decrease">Decrease</option>
+    </select>
+    <select id="kaphaFilter">
+      <option value="">Kapha</option>
+      <option value="increase">Increase</option>
+      <option value="decrease">Decrease</option>
+    </select>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Food (Tamil)</th>
+        <th>Vata</th>
+        <th>Pitta</th>
+        <th>Kapha</th>
+      </tr>
+    </thead>
+    <tbody id="foodTableBody">
+      <tr><td colspan="4">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ─── Firebase + Explorer Script ─────────────────────────────────────── -->
+  <script type="module">
+    import { initializeApp }                from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+    import { getAnalytics }                 from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics.js';
+    import { getFirestore, collection, getDocs }
+      from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-TlH62Bsn-CuhpXeV5hPM0i7P79H4ARk",
+      authDomain: "vpkproject-bb842.firebaseapp.com",
+      projectId: "vpkproject-bb842",
+      storageBucket: "vpkproject-bb842.firebasestorage.app",
+      messagingSenderId: "887514519530",
+      appId: "1:887514519530:web:958f01dfef93ff31bfc493",
+      measurementId: "G-XTYY6LSHVT"
+    };
+
+    const app       = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db        = getFirestore(app);
+
+    const tableBody   = document.getElementById("foodTableBody");
+    const searchInput = document.getElementById("searchInput");
+    const vataFilter  = document.getElementById("vataFilter");
+    const pittaFilter = document.getElementById("pittaFilter");
+    const kaphaFilter = document.getElementById("kaphaFilter");
+    let allFoods = [];
+
+    async function fetchData() {
+      try {
+        const snap = await getDocs(collection(db, "vpkFoods"));
+        allFoods = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderTable();
+      } catch (err) {
+        tableBody.innerHTML = `<tr><td colspan="4">Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    function renderTable() {
+      const kw    = searchInput.value.toLowerCase();
+      const vata  = vataFilter.value;
+      const pitta = pittaFilter.value;
+      const kapha = kaphaFilter.value;
+
+      const filtered = allFoods.filter(item => {
+        const nameMatch  = item.food_item.toLowerCase().includes(kw);
+        const vataMatch  = !vata  || item.effects.vata  === vata;
+        const pittaMatch = !pitta || item.effects.pitta === pitta;
+        const kaphaMatch = !kapha || item.effects.kapha  === kapha;
+        return nameMatch && vataMatch && pittaMatch && kaphaMatch;
+      });
+
+      if (!filtered.length) {
+        tableBody.innerHTML = `<tr><td colspan="4">No matching foods</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = filtered.map(item => `
+        <tr>
+          <td>${item.food_item}</td>
+          <td>${item.effects.vata}</td>
+          <td>${item.effects.pitta}</td>
+          <td>${item.effects.kapha}</td>
+        </tr>
+      `).join("");
+    }
+
+    [searchInput, vataFilter, pittaFilter, kaphaFilter]
+      .forEach(el => el.addEventListener("input", renderTable));
+
+    fetchData();
+  </script>
+
+  <!-- ─── Carousel Script ──────────────────────────────────────────────── -->
+  <script>
+    // Carousel controls & auto-rotate
+    const slides = document.querySelectorAll('.carousel .slide');
+    const prev   = document.querySelector('.carousel .prev');
+    const next   = document.querySelector('.carousel .next');
+    let idx = 0;
+    function show(i) {
+      slides.forEach((s,j) => s.classList.toggle('active', i===j));
+    }
+    prev.addEventListener('click', () => { idx=(idx-1+slides.length)%slides.length; show(idx); });
+    next.addEventListener('click', () => { idx=(idx+1)%slides.length; show(idx); });
+    setInterval(() => next.click(), 5000);
+
+    // Disable keyboard shortcuts for copy/select/view-source
+    document.addEventListener('keydown', e => {
+      if (e.keyCode === 123 /*F12*/ ||
+          ((e.ctrlKey||e.metaKey) && ['A','C','U'].includes(e.key.toUpperCase()))) {
+        e.preventDefault();
+      }
+    });
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('copy', e => e.preventDefault());
+    document.addEventListener('selectstart', e => e.preventDefault());
+  </script>
+</body>
+</html>
